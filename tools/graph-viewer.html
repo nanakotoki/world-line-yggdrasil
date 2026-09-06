@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>world-line-yggdrasil — 战斗状态图查看器</title>
+<style>
+  body { margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; background:#14161c; color:#e8e8e8; overflow:hidden; }
+  #toolbar { position:fixed; top:0; left:0; right:0; height:44px; background:#1d2028; border-bottom:1px solid #333; display:flex; align-items:center; gap:12px; padding:0 12px; z-index:10; }
+  #toolbar label { font-size:13px; color:#aaa; }
+  #toolbar .stat { font-size:12px; color:#8ab4f8; }
+  #canvas-wrap { position:fixed; inset:44px 0 0 0; }
+  canvas { display:block; background:#14161c; }
+  #details { position:fixed; right:12px; top:56px; width:360px; max-height:calc(100vh - 80px); overflow:auto; background:#1d2028cc; border:1px solid #3a3f4a; border-radius:8px; padding:12px; font-size:12px; display:none; z-index:10; }
+  #details h3 { margin:0 0 8px; font-size:14px; color:#ffd28a; }
+  #details .row { margin:3px 0; }
+  #details .lbl { color:#8ab4f8; }
+  #details pre { white-space:pre-wrap; word-break:break-all; font-size:11px; color:#c8c8c8; background:#14161c; padding:6px; border-radius:4px; margin:6px 0 0; }
+  #legend { position:fixed; left:12px; bottom:12px; background:#1d2028cc; border:1px solid #3a3f4a; border-radius:8px; padding:8px 12px; font-size:12px; z-index:10; }
+  #legend div { display:flex; align-items:center; gap:6px; margin:2px 0; }
+  .sw { width:14px; height:14px; border-radius:50%; display:inline-block; }
+  #hint { position:fixed; bottom:12px; right:12px; color:#888; font-size:11px; z-index:10; }
+</style>
+</head>
+<body>
+  <div id="toolbar">
+    <label>图文件：<input type="file" id="file" accept=".json"></label>
+    <span class="stat" id="stat"></span>
+  </div>
+  <div id="canvas-wrap"><canvas id="cv"></canvas></div>
+  <div id="details"></div>
+  <div id="legend">
+    <div><span class="sw" style="background:#4caf50"></span>根结点</div>
+    <div><span class="sw" style="background:#ffd54f"></span>胜利终结</div>
+    <div><span class="sw" style="background:#ef5350"></span>失败终结</div>
+    <div><span class="sw" style="background:#64b5f6"></span>普通状态</div>
+    <div><span class="sw" style="background:#ce93d8;border-radius:2px"></span>当前结点</div>
+  </div>
+  <div id="hint">拖动平移 · 滚轮缩放 · 点击结点看详情</div>
+<script>
+"use strict";
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+let nodes = [], edges = [], selected = null;
+let view = { x: 0, y: 0, z: 1 };
+let dragging = null, dragNode = null, W = 0, H = 0;
+
+function resize(){ W = cv.width = window.innerWidth; H = cv.height = window.innerHeight - 44; }
+window.addEventListener("resize", resize); resize();
+
+function sw(s){ return { ...s }; }
+
+function loadGraph(g){
+  nodes = [];
+  const byId = new Map();
+  for (const n of (g.nodes||[])) {
+    const node = sw(n);
+    node.x = (Math.random()-0.5)*400;
+    node.y = (Math.random()-0.5)*400;
+    node.vx = 0; node.vy = 0;
+    nodes.push(node); byId.set(n.id, node);
+  }
+  edges = (g.edges||[]).map(e => ({ from: byId.get(e.from), to: byId.get(e.to), action: e.action, target: e.target }));
+  edges = edges.filter(e => e.from && e.to);
+  // layout: simple force-directed
+  const iter = 300, rep = 60000, spring = 0.012, rest = 90, center = 0.02;
+  for (let i=0;i<iter;i++){
+    for (const a of nodes){
+      a.vx *= 0.6; a.vy *= 0.6;
+      a.vx += (0 - a.x)*center; a.vy += (0 - a.y)*center;
+    }
+    for (let a=0;a<nodes.length;a++){
+      for (let b=a+1;b<nodes.length;b++){
+        const A=nodes[a], B=nodes[b];
+        let dx=A.x-B.x, dy=A.y-B.y;
+        let d2=dx*dx+dy*dy+1e-6, d=Math.sqrt(d2);
+        const f=rep/d2;
+        dx/=d; dy/=d;
+        A.vx+=dx*f; A.vy+=dy*f;
+        B.vx-=dx*f; B.vy-=dy*f;
+      }
+    }
+    for (const e of edges){
+      const dx=e.to.x-e.from.x, dy=e.to.y-e.from.y;
+      const d=Math.sqrt(dx*dx+dy*dy+1e-6);
+      const f=spring*(d-rest);
+      e.from.vx+=dx/d*f; e.from.vy+=dy/d*f;
+      e.to.vx-=dx/d*f; e.to.vy-=dy/d*f;
+    }
+    for (const n of nodes){ n.x+=n.vx; n.y+=n.vy; }
+  }
+  document.getElementById("stat").textContent =
+    `scope=${g.scope}  结点=${nodes.length}  边=${edges.length}  根=${g.root_node}`;
+  selected = null;
+  draw();
+}
+
+function nodeColor(n){
+  if (n.id === groot) return "#4caf50";
+  if (n.terminal) return n.terminal_kind === "Defeat" ? "#ef5350" : "#ffd54f";
+  return "#64b5f6";
+}
+let groot = null;
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.save();
+  ctx.translate(W/2 + view.x, H/2 + view.y);
+  ctx.scale(view.z, view.z);
+  for (const e of edges){
+    const sx=e.from.x, sy=e.from.y, tx=e.to.x, ty=e.to.y;
+    const dx=tx-sx, dy=ty-sy, d=Math.sqrt(dx*dx+dy*dy)||1;
+    ctx.strokeStyle="#5a6270"; ctx.lineWidth=1.2;
+    if (e.from===e.to){
+      ctx.beginPath(); ctx.arc(sx, sy-18, 12, Math.PI*1.1, Math.PI*1.9); ctx.stroke();
+      arrow(sx-16, sy-18, -1, 0);
+    } else if (d < 2){ continue; }
+    else {
+      const mx=(sx+tx)/2, my=(sy+ty)/2;
+      const perp = 10/Math.max(d,1);
+      const bend = edgeBend(e);
+      ctx.beginPath();
+      ctx.moveTo(sx,sy);
+      ctx.quadraticCurveTo(mx - (ty-sy)*perp*bend, my + (tx-sx)*perp*bend, tx,ty);
+      ctx.stroke();
+      // arrow at end
+      const ang = Math.atan2(ty-my, tx-mx);
+      arrow(tx - Math.cos(ang)*14*Math.sign(1), ty - Math.sin(ang)*14*Math.sign(1), Math.cos(ang), Math.sin(ang));
+    }
+  }
+  for (const n of nodes){
+    const r = n.terminal ? 11 : 8;
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 2*Math.PI);
+    ctx.fillStyle = nodeColor(n); ctx.fill();
+    if (n.id === groot) ctx.strokeStyle="#2e7d32";
+    else if (n.id === gcur) ctx.strokeStyle="#ce93d8";
+    else ctx.strokeStyle="#0000";
+    if (n.id === gcur || n.id === groot){ ctx.lineWidth=2.5; ctx.stroke(); }
+    if (n.name){
+      ctx.fillStyle="#fff"; ctx.font="11px sans-serif"; ctx.textAlign="center";
+      ctx.fillText(n.name, n.x, n.y + r + 12);
+    }
+  }
+  ctx.restore();
+}
+let gcur = null;
+const bendCount = {};
+function edgeBend(e){ const k = e.from.id+"->"+e.to.id+"::"+e.action; bendCount[k]=(bendCount[k]||0)+1; return bendCount[k]; }
+function arrow(x,y,cx,cy){
+  const ang = Math.atan2(cy,cx);
+  ctx.beginPath();
+  ctx.moveTo(x+Math.cos(ang)*8, y+Math.sin(ang)*8);
+  ctx.lineTo(x+Math.cos(ang+2.6)*8, y+Math.sin(ang+2.6)*8);
+  ctx.lineTo(x+Math.cos(ang-2.6)*8, y+Math.sin(ang-2.6)*8);
+  ctx.closePath(); ctx.fillStyle="#8a93a3"; ctx.fill();
+}
+
+function screenToWorld(px,py){
+  return { x: (px - W/2 - view.x)/view.z, y: (py - H/2 - view.y)/view.z };
+}
+function hitTest(px,py){
+  const w = screenToWorld(px,py);
+  let best=null,bd=1e9;
+  for (const n of nodes){
+    const dx=n.x-w.x, dy=n.y-w.y, dd=dx*dx+dy*dy;
+    const r = n.terminal?11:8;
+    if (dd < r*r+6 && dd<bd){ bd=dd; best=n; }
+  }
+  return best;
+}
+
+cv.addEventListener("pointerdown", e=>{
+  const n = hitTest(e.clientX, e.clientY);
+  if (n){ dragNode = n; selected = n; showDetails(n); }
+  else { dragging = { x:e.clientX, y:e.clientY, vx:view.x, vy:view.y }; }
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", e=>{
+  if (dragNode){ dragNode.x = screenToWorld(e.clientX,e.clientY).x; dragNode.y = screenToWorld(e.clientX,e.clientY).y; draw(); }
+  else if (dragging){ view.x = dragging.vx + (e.clientX-dragging.x); view.y = dragging.vy + (e.clientY-dragging.y); draw(); }
+});
+cv.addEventListener("pointerup", ()=>{ dragging=null; dragNode=null; });
+cv.addEventListener("wheel", e=>{
+  e.preventDefault();
+  const f = e.deltaY<0?1.1:0.9;
+  view.z = Math.min(4, Math.max(0.2, view.z*f));
+  draw();
+}, {passive:false});
+
+function shortLabel(n){
+  const s = n.snapshot||{};
+  const en = (s.Enemies||[]).map(x=>x.Id+"("+x.Hp+")").join(" ");
+  return `第${s.TurnNumber??"?"}回合 HP ${s.PlayerHp??"?"}/${s.PlayerMaxHp??"?"} 手牌[${(s.Hand||[]).length}] 敌人[${en}]`;
+}
+function showDetails(n){
+  const d = document.getElementById("details");
+  const s = n.snapshot||{};
+  const inE = edges.filter(e=>e.from===n).map(e=>`${e.action||"?"} → ${e.to.id.slice(0,8)}`);
+  const outE = edges.filter(e=>e.to===n).map(e=>`← ${e.action||"?"} (${e.from.id.slice(0,8)})`);
+  d.innerHTML = `<h3>${n.name ? "★ "+n.name : "结点 "+n.id.slice(0,8)}</h3>
+    <div class="row"><span class="lbl">id:</span> ${n.id}</div>
+    <div class="row"><span class="lbl">合并次数:</span> ${n.merge_count??1}</div>
+    <div class="row"><span class="lbl">终结:</span> ${n.terminal ? n.terminal_kind : "否"}</div>
+    <div class="row"><span class="lbl">摘要:</span> ${shortLabel(n)}</div>
+    ${inE.length?`<div class="row"><span class="lbl">出边(${inE.length}):</span></div><pre>${inE.join("\n")}</pre>`:""}
+    ${outE.length?`<div class="row"><span class="lbl">入边(${outE.length}):</span></div><pre>${outE.join("\n")}</pre>`:""}
+    <div class="row"><span class="lbl">规范状态:</span></div><pre>${n.label||""}</pre>`;
+  d.style.display = "block";
+}
+
+document.getElementById("file").addEventListener("change", ev=>{
+  const f = ev.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const g = JSON.parse(r.result);
+      groot = g.root_node; gcur = g.current_node;
+      loadGraph(g);
+    }catch(err){ alert("解析失败: "+err.message); }
+  };
+  r.readAsText(f);
+});
+draw();
+</script>
+</body>
+</html>

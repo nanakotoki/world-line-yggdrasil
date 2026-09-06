@@ -1,0 +1,38 @@
+== 随机数队列 ==
+与[[sts:随机数|前作]]不同，本作将随机数队列进行了极为精细的划分，各类随机结果变得彼此独立、非常稳定。
+
+代码中目前有的随机数队列收录在了下方的表格中，点击下方按钮以展开。
+{| class="wikitable mw-collapsible mw-collapsed" style="width:100%; text-align:left"
+|+ 随机数队列类型
+! colspan="2" | 已有的随机数队列
+|-
+! 原文 !! 中文对照
+|-
+| UpFront || 开局预先生成用的随机
+|-
+| Shuffle || 洗牌随机
+|-
+| MapPathing || 地图路径生成随机
+|-
+| UnknownMapPoint || 未知地图点内容随机
+|-
+| MapEvents || 地图事件分布随机
+|-
+| MapRewards || 地图奖励随机
+|-
+| CombatCardGeneration || 战斗中临时生牌随机
+|-
+| CombatTargets || 战斗目标随机
+|-
+| CombatCardSelection || 战斗中从牌堆/牌组选牌随机
+|-
+| CombatEnergyCosts || 战斗中费用随机
+|-
+| TreasureRoomRelics || 宝箱房遗物随机
+|-
+| Niche || 杂项/冷门专用随机
+|-
+| Shops || 商店随机
+|}
+
+（来源：https://sts2.huijiwiki.com/wiki/SL#%E9%9A%8F%E6%9C%BA%E6%95%B0%E9%98%9F%E5%88%97）

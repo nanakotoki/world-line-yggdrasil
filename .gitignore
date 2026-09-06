@@ -1,0 +1,20 @@
+bin/
+obj/
+build/
+*.user
+.vs/
+
+# 构建产物
+*.dll
+WorldLineYggdrasil/bin/
+WorldLineYggdrasil/obj/
+
+# 调试临时文件
+steam_appid.txt
+*.save
+*.save.backup
+probe-*.ps1
+
+# IDE
+.idea/
+.vscode/

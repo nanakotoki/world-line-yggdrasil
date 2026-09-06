@@ -1,0 +1,12 @@
+{
+  "id": "WorldLineYggdrasil",
+  "name": "World Line Yggdrasil",
+  "author": "world-line-yggdrasil",
+  "description": "Combat state-space graph explorer for Slay the Spire 2: record, restore, and auto-search combat states.",
+  "version": "0.0.1",
+  "min_game_version": "0.111.0",
+  "has_pck": false,
+  "has_dll": true,
+  "dependencies": [],
+  "affects_gameplay": true
+}

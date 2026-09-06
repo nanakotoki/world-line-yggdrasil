@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>WorldLineYggdrasil</RootNamespace>
+    <AssemblyName>WorldLineYggdrasil</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Sts2DataDir Condition="'$(Sts2DataDir)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Slay the Spire 2/data_sts2_windows_x86_64</Sts2DataDir>
+    <Sts2ModsDir Condition="'$(Sts2ModsDir)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Slay the Spire 2/mods</Sts2ModsDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="sts2">
+      <HintPath>$(Sts2DataDir)/sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(Sts2DataDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(Sts2DataDir)/GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="WorldLineYggdrasil.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="DeployToMods" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <MakeDir Directories="$(Sts2ModsDir)/WorldLineYggdrasil/" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(Sts2ModsDir)/WorldLineYggdrasil/" />
+    <Copy SourceFiles="$(TargetDir)WorldLineYggdrasil.json" DestinationFolder="$(Sts2ModsDir)/WorldLineYggdrasil/" />
+    <Message Text="[WorldLineYggdrasil] Deployed to $(Sts2ModsDir)/WorldLineYggdrasil/" Importance="high" />
+  </Target>
+</Project>
