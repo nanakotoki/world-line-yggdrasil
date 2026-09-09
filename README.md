@@ -1,5 +1,8 @@
 # world-line-yggdrasil（世界线·战斗状态图）
 
+> [!INFO]
+> 本项目之后不太会更新了。新项目在 [nanakotoki/new-world-line-yggdrasil](https://github.com/nanakotoki/new-world-line-yggdrasil) 。
+
 杀戮尖塔2（Slay the Spire 2）的战斗状态空间图探索模组。
 
 每场战斗被记录成一张**有向图**：结点 = 游戏状态，边 = 玩家操作（打牌 / 用药水 / 弃药水 /
